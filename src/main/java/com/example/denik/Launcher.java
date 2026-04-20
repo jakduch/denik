@@ -1,9 +1,7 @@
-package com.example.denik;
-
-import javafx.application.Application;
+package com.example.knihapokus;
 
 public class Launcher {
     public static void main(String[] args) {
-        Application.launch(HelloApplication.class, args);
+        FlipBookTest.launch(FlipBookTest.class, args);
     }
 }
