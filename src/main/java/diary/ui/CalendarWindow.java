@@ -9,16 +9,21 @@ import java.awt.*;
 import java.time.*;
 import java.util.List;
 
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.time.LocalDate;
+import java.util.List;
+
 public class CalendarWindow extends JFrame {
 
     private LocalDate currentMonth = LocalDate.now().withDayOfMonth(1);
 
     public CalendarWindow() {
-
         setTitle("Kalendář");
-        setSize(600, 400);
+        setSize(700, 500);
         setLocationRelativeTo(null);
-
         render();
     }
 
@@ -27,6 +32,7 @@ public class CalendarWindow extends JFrame {
         getContentPane().removeAll();
         setLayout(new BorderLayout());
 
+        // 🔝 TOP PANEL
         JPanel top = new JPanel();
 
         JButton prev = new JButton("<");
@@ -35,6 +41,32 @@ public class CalendarWindow extends JFrame {
         JButton exit = new JButton("Exit");
 
         JLabel label = new JLabel(currentMonth.getMonth() + " " + currentMonth.getYear());
+        label.setFont(new Font("Segoe UI", Font.BOLD, 18));
+
+        prev.setFocusPainted(false);
+        prev.setBorderPainted(false);
+        prev.setOpaque(true);
+        prev.setBackground(Color.WHITE);
+        prev.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        prev.setPreferredSize(new Dimension(80, 60));
+        next.setFocusPainted(false);
+        next.setBorderPainted(false);
+        next.setOpaque(true);
+        next.setBackground(Color.WHITE);
+        next.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        next.setPreferredSize(new Dimension(80, 60));
+        back.setFocusPainted(false);
+        back.setBorderPainted(false);
+        back.setOpaque(true);
+        back.setBackground(Color.WHITE);
+        back.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        back.setPreferredSize(new Dimension(80, 60));
+        exit.setFocusPainted(false);
+        exit.setBorderPainted(false);
+        exit.setOpaque(true);
+        exit.setBackground(Color.WHITE);
+        exit.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        exit.setPreferredSize(new Dimension(80, 60));
 
         prev.addActionListener(e -> {
             currentMonth = currentMonth.minusMonths(1);
@@ -60,23 +92,61 @@ public class CalendarWindow extends JFrame {
 
         add(top, BorderLayout.NORTH);
 
-        JPanel grid = new JPanel(new GridLayout(0, 7));
+        // 🗓️ GRID PANEL
+        JPanel grid = new JPanel(new GridLayout(0, 7, 5, 5));
+        grid.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        grid.setBackground(Color.WHITE);
+
+        // dny v týdnu
+        String[] days = {"Po", "Út", "St", "Čt", "Pá", "So", "Ne"};
+        for (String d : days) {
+            JLabel l = new JLabel(d, SwingConstants.CENTER);
+            l.setFont(new Font("Segoe UI", Font.BOLD, 14));
+            grid.add(l);
+        }
 
         LocalDate first = currentMonth.withDayOfMonth(1);
-
         int offset = first.getDayOfWeek().getValue();
 
         for (int i = 1; i < offset; i++) {
             grid.add(new JLabel());
         }
 
-        int days = currentMonth.lengthOfMonth();
+        int daysInMonth = currentMonth.lengthOfMonth();
 
-        for (int i = 1; i <= days; i++) {
+        for (int i = 1; i <= daysInMonth; i++) {
 
             LocalDate date = currentMonth.withDayOfMonth(i);
-
             JButton btn = new JButton(String.valueOf(i));
+
+            // styl tlačítka
+            btn.setFocusPainted(false);
+            btn.setBorderPainted(false);
+            btn.setOpaque(true);
+            btn.setBackground(Color.WHITE);
+            btn.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+            btn.setPreferredSize(new Dimension(80, 60));
+
+            // dnešní den
+            if (date.equals(LocalDate.now())) {
+                btn.setBackground(new Color(100, 149, 237));
+                btn.setForeground(Color.WHITE);
+            }
+
+            // hover efekt
+            btn.addMouseListener(new MouseAdapter() {
+                public void mouseEntered(MouseEvent evt) {
+                    if (!date.equals(LocalDate.now())) {
+                        btn.setBackground(new Color(220, 220, 220));
+                    }
+                }
+
+                public void mouseExited(MouseEvent evt) {
+                    if (!date.equals(LocalDate.now())) {
+                        btn.setBackground(Color.WHITE);
+                    }
+                }
+            });
 
             btn.addActionListener(e -> showEntries(date));
 
@@ -96,6 +166,8 @@ public class CalendarWindow extends JFrame {
                 .toList();
 
         JTextArea area = new JTextArea();
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        area.setEditable(false);
 
         if (list.isEmpty()) {
             area.setText("Žádné zápisy");
