@@ -4,12 +4,12 @@ import java.time.*;
 
 public class DateUtils {
 
-    // 📌 vytvoření bezpečného času
+    // vytvoření bezpečného času
     public static LocalDateTime now() {
         return LocalDateTime.now();
     }
 
-    // 📌 převod z kalendáře
+    // převod z kalendáře
     public static LocalDateTime fromDate(LocalDate date) {
         if (date == null) {
             return LocalDateTime.now();
@@ -17,7 +17,7 @@ public class DateUtils {
         return date.atStartOfDay();
     }
 
-    // 📌 bezpečné porovnání dne
+    // porovnání dne
     public static boolean sameDay(LocalDateTime a, LocalDate b) {
         return a.toLocalDate().equals(b);
     }

@@ -5,7 +5,6 @@ import diary.storage.FileStorage;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import diary.utils.DateUtils;
