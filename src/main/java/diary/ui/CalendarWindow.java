@@ -166,10 +166,25 @@ public class CalendarWindow extends JFrame {
         List<Entry> list = FileStorage.loadEntries().stream()
                 .filter(e -> e.getDateTime().toLocalDate().equals(date))
                 .toList();
+        JButton addBtn = new JButton("Přidat zápis");
+        JButton okBtn = new JButton("OK");
 
-        JPanel panel = new JPanel();
+        addBtn.addActionListener(e ->
+                Navigation.go(this, new EntryWindow(date.atStartOfDay()))
+        );
+        okBtn.addActionListener(e -> {
+            dialog.;
+        });
+
+        Object[] options = {addBtn, okBtn};
+
+        JPanel panel = null;
+
+        panel = new JPanel(new BorderLayout());
+
         panel.setLayout(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        panel.add(addBtn, BorderLayout.SOUTH);
 
         JLabel title = new JLabel("Zápisy pro " + date);
         title.setFont(new Font("Segoe UI", Font.BOLD, 18));
@@ -217,7 +232,15 @@ public class CalendarWindow extends JFrame {
 
             panel.add(scrollPane, BorderLayout.CENTER);
         }
-
-        JOptionPane.showMessageDialog(this, panel, "Zápisy", JOptionPane.PLAIN_MESSAGE);
+        JOptionPane.showOptionDialog(
+                this,
+                panel,
+                "Zápisy",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                options,
+                okBtn
+        );
     }
 }
