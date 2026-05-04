@@ -17,6 +17,8 @@ public class Main {
                 FileStorage.saveUserName(name);
             }
 
+
+
             new MainWindow(name);
         });
     }
