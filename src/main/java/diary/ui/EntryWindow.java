@@ -1,163 +1,247 @@
 package diary.ui;
 
-import diary.Navigation;
 import diary.model.Entry;
 import diary.storage.FileStorage;
 import diary.utils.DateUtils;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import javax.imageio.ImageIO;
 
+/**
+ * Okno pro přidání nového zápisu pro konkrétní den.
+ * - datum je v titulku okna (žádné "Nový zápis – ..." uvnitř)
+ * - šipky < / > přepínají na předchozí / následující den
+ * - obrázek se zobrazuje jako náhled (ne jako cesta k souboru)
+ * - po Uložit se okno zavře a zavolá se onSaved callback (pro obnovu kalendáře)
+ */
 public class EntryWindow extends JFrame {
 
-    public EntryWindow(LocalDateTime date) {
+    private static final int PREVIEW_W = 240;
+    private static final int PREVIEW_H = 180;
 
-        setTitle("Zápis");
-        setSize(700, 600);
+    private final LocalDate day;
+    private final Runnable onSaved;     // může být null
+
+    private final JTextField titleField = Style.inputField();
+    private final JTextArea  textArea   = Style.textArea();
+    private final JLabel     preview    = new JLabel();
+    private String           selectedImage;          // cesta k vybranému obrázku
+
+    public EntryWindow(LocalDate day, Runnable onSaved) {
+        this.day = (day != null) ? day : LocalDate.now();
+        this.onSaved = onSaved;
+
+        setTitle("Zápis – " + DateUtils.formatDay(this.day));
+        setSize(820, 560);
         setLocationRelativeTo(null);
+        setIconImage(Icons.calendarIcon(64));
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        Style.decorateFrame(this);
         setLayout(new BorderLayout());
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        JTextField title = new JTextField();
-        JTextArea text = new JTextArea();
+        add(buildHeader(),  BorderLayout.NORTH);
+        add(buildCenter(),  BorderLayout.CENTER);
+        add(buildFooter(),  BorderLayout.SOUTH);
 
-        JTextField imagePathField = new JTextField();
-        imagePathField.setEditable(false);
+        SwingUtilities.invokeLater(titleField::requestFocusInWindow);
+    }
 
-        String[] img = {null};
+    // ───────────── HEADER s šipkami ─────────────
+    private JPanel buildHeader() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(Style.PRIMARY);
+        header.setBorder(new EmptyBorder(10, 16, 10, 16));
 
-        // 📅 дата
-        LocalDateTime safeDateTime =
-                (date != null)
-                        ? DateUtils.fromDate(LocalDate.from(date))
-                        : DateUtils.now();
+        JButton prev = navButton("◀");
+        JButton next = navButton("▶");
 
-        // 🔝 HEADER (с датой)
-        JLabel header = new JLabel(
-                "Nový zápis – " + safeDateTime.toLocalDate(),
-                SwingConstants.CENTER
-        );
+        JLabel dateLabel = new JLabel(DateUtils.formatDay(day), SwingConstants.CENTER);
+        dateLabel.setFont(Style.FONT_BIG);
+        dateLabel.setForeground(Color.WHITE);
 
-        header.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        header.setOpaque(true);
-        header.setBackground(Color.GRAY);
-        header.setForeground(Color.WHITE);
-        header.setPreferredSize(new Dimension(0, 50));
+        header.add(prev, BorderLayout.WEST);
+        header.add(dateLabel, BorderLayout.CENTER);
+        header.add(next, BorderLayout.EAST);
 
-        add(header, BorderLayout.NORTH);
+        prev.addActionListener(e -> jumpToDay(day.minusDays(1)));
+        next.addActionListener(e -> jumpToDay(day.plusDays(1)));
 
-        // 🧠 CENTER
-        JPanel center = new JPanel();
-        center.setLayout(new GridBagLayout());
-        center.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
-        center.setBackground(Color.WHITE);
+        return header;
+    }
 
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(5,5,5,5);
-        c.gridx = 0;
-        c.gridy = 0;
+    private JButton navButton(String txt) {
+        JButton b = new JButton(txt);
+        b.setFont(new Font(Style.FONT_NAME, Font.BOLD, 18));
+        b.setForeground(Color.WHITE);
+        b.setBackground(Style.PRIMARY);
+        b.setBorder(new EmptyBorder(6, 14, 6, 14));
+        b.setBorderPainted(false);
+        b.setFocusPainted(false);
+        b.setOpaque(true);
+        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return b;
+    }
 
-        // Titulek
-        center.add(new JLabel("Titulek:"), c);
+    private void jumpToDay(LocalDate target) {
+        dispose();
+        new EntryWindow(target, onSaved).setVisible(true);
+    }
 
-        c.gridy++;
-        title.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        center.add(title, c);
+    // ───────────── CENTER (text + náhled obrázku) ─────────────
+    private JPanel buildCenter() {
+        JPanel center = new JPanel(new BorderLayout(16, 16));
+        center.setBackground(Style.BG);
+        center.setBorder(new EmptyBorder(18, 20, 18, 20));
 
-        // Text
-        c.gridy++;
-        center.add(new JLabel("Text:"), c);
+        // levá strana: titulek + text
+        JPanel left = new JPanel();
+        left.setOpaque(false);
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
 
-        c.gridy++;
-        c.fill = GridBagConstraints.BOTH;
-        c.weightx = 1;
-        c.weighty = 1;
+        JLabel titleLbl = new JLabel("Titulek");
+        titleLbl.setFont(Style.FONT_BOLD);
+        titleLbl.setForeground(Style.TEXT_MUTED);
+        titleLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        text.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        JScrollPane scroll = new JScrollPane(text);
-        scroll.setPreferredSize(new Dimension(400, 300)); // больше поле
+        titleField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        titleField.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        center.add(scroll, c);
+        JLabel textLbl = new JLabel("Text");
+        textLbl.setFont(Style.FONT_BOLD);
+        textLbl.setForeground(Style.TEXT_MUTED);
+        textLbl.setBorder(new EmptyBorder(12, 0, 4, 0));
+        textLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Obrázek
-        c.gridy++;
-        c.weighty = 0;
-        c.fill = GridBagConstraints.HORIZONTAL;
+        JScrollPane scroll = new JScrollPane(textArea);
+        scroll.setBorder(BorderFactory.createLineBorder(Style.BORDER));
+        scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        center.add(new JLabel("Obrázek:"), c);
+        left.add(titleLbl);
+        left.add(Box.createVerticalStrut(4));
+        left.add(titleField);
+        left.add(textLbl);
+        left.add(scroll);
 
-        c.gridy++;
-        center.add(imagePathField, c);
+        // pravá strana: náhled obrázku
+        JPanel right = new JPanel(new BorderLayout(0, 8));
+        right.setOpaque(false);
+        right.setPreferredSize(new Dimension(PREVIEW_W + 20, 0));
 
-        add(center, BorderLayout.CENTER);
+        JLabel imgLbl = new JLabel("Obrázek");
+        imgLbl.setFont(Style.FONT_BOLD);
+        imgLbl.setForeground(Style.TEXT_MUTED);
 
-        // 🔽 BUTTONS
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
-        bottom.setBackground(Color.GRAY);
+        preview.setHorizontalAlignment(SwingConstants.CENTER);
+        preview.setVerticalAlignment(SwingConstants.CENTER);
+        preview.setPreferredSize(new Dimension(PREVIEW_W, PREVIEW_H));
+        preview.setBackground(Style.SURFACE);
+        preview.setOpaque(true);
+        preview.setForeground(Style.TEXT_MUTED);
+        preview.setFont(Style.FONT_SMALL);
+        preview.setBorder(BorderFactory.createDashedBorder(Style.BORDER, 1.5f, 4f, 4f, true));
+        renderPreview();
 
-        JButton save = new JButton("Uložit zápis");
-        JButton delete = new JButton("Smazat zápis");
-        JButton image = new JButton("Vybrat obrázek");
-        JButton back = new JButton("Zpátky do kalendáře");
+        JPanel imgBtns = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        imgBtns.setOpaque(false);
+        JButton pick   = Style.secondaryButton("Vybrat…");
+        JButton remove = Style.secondaryButton("Odebrat");
+        imgBtns.add(pick);
+        imgBtns.add(remove);
 
-        for (JButton b : new JButton[]{save, delete, image, back}) {
-            b.setFocusPainted(false);
-            b.setBorderPainted(false);
-            b.setOpaque(true);
-            b.setBackground(Color.GRAY);
-            b.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-            b.setMargin(new Insets(10, 20, 10, 20)); // 🔥 padding вместо фиксированной ширины
-            bottom.add(b);
+        pick.addActionListener(e -> chooseImage());
+        remove.addActionListener(e -> {
+            selectedImage = null;
+            renderPreview();
+        });
+
+        right.add(imgLbl,  BorderLayout.NORTH);
+        right.add(preview, BorderLayout.CENTER);
+        right.add(imgBtns, BorderLayout.SOUTH);
+
+        center.add(left,  BorderLayout.CENTER);
+        center.add(right, BorderLayout.EAST);
+        return center;
+    }
+
+    private void chooseImage() {
+        JFileChooser fc = new JFileChooser();
+        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Obrázky (PNG, JPG, GIF)", "png", "jpg", "jpeg", "gif", "bmp"));
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            selectedImage = fc.getSelectedFile().getAbsolutePath();
+            renderPreview();
+        }
+    }
+
+    private void renderPreview() {
+        preview.setIcon(null);
+        if (selectedImage == null) {
+            preview.setText("(žádný obrázek)");
+            return;
+        }
+        try {
+            BufferedImage img = ImageIO.read(new File(selectedImage));
+            if (img == null) {
+                preview.setText("Nelze načíst obrázek");
+                return;
+            }
+            preview.setText("");
+            preview.setIcon(new ImageIcon(scaleToFit(img, PREVIEW_W - 8, PREVIEW_H - 8)));
+        } catch (Exception ex) {
+            preview.setText("Nelze načíst obrázek");
+        }
+    }
+
+    /** Zmenší obrázek tak, aby se vešel do daných rozměrů a zachoval poměr stran. */
+    static Image scaleToFit(BufferedImage src, int maxW, int maxH) {
+        double scale = Math.min((double) maxW / src.getWidth(),
+                                (double) maxH / src.getHeight());
+        int w = (int) Math.round(src.getWidth() * scale);
+        int h = (int) Math.round(src.getHeight() * scale);
+        return src.getScaledInstance(Math.max(1, w), Math.max(1, h), Image.SCALE_SMOOTH);
+    }
+
+    // ───────────── FOOTER s tlačítky ─────────────
+    private JPanel buildFooter() {
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 12));
+        footer.setBackground(Style.BG);
+        footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Style.BORDER));
+
+        JButton cancel = Style.secondaryButton("Zavřít");
+        JButton save   = Style.primaryButton("Uložit zápis");
+
+        cancel.addActionListener(e -> dispose());
+        save.addActionListener(e -> doSave());
+
+        footer.add(cancel);
+        footer.add(save);
+        return footer;
+    }
+
+    private void doSave() {
+        String t = titleField.getText() == null ? "" : titleField.getText().trim();
+        if (t.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Zápis musí mít titulek.", "Chybí titulek",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
         }
 
-        add(bottom, BorderLayout.SOUTH);
+        // čas: dnešní den získá aktuální čas, jinak začátek vybraného dne
+        LocalDateTime dt = day.equals(LocalDate.now())
+                ? LocalDateTime.now()
+                : day.atTime(LocalDateTime.now().toLocalTime());
 
-        // 🎯 ACTIONS
+        Entry entry = new Entry(t, textArea.getText(), dt, selectedImage);
+        FileStorage.saveEntry(entry);
 
-        image.addActionListener(e -> {
-            JFileChooser fc = new JFileChooser();
-            if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                img[0] = fc.getSelectedFile().getAbsolutePath();
-                imagePathField.setText(img[0]);
-            }
-        });
-
-        save.addActionListener(e -> {
-
-            Entry entry = new Entry(
-                    title.getText(),
-                    text.getText(),
-                    safeDateTime,
-                    img[0]
-            );
-
-            FileStorage.saveEntry(entry);
-
-            JOptionPane.showMessageDialog(this, "Uloženo!");
-        });
-
-        delete.addActionListener(e -> {
-
-            int res = JOptionPane.showConfirmDialog(
-                    this,
-                    "Opravdu smazat?",
-                    "Potvrzení",
-                    JOptionPane.YES_NO_OPTION
-            );
-
-            if (res == JOptionPane.YES_OPTION) {
-                FileStorage.deleteEntry(new Entry(title.getText(), "", safeDateTime, null));
-                JOptionPane.showMessageDialog(this, "Smazáno");
-            }
-        });
-
-        back.addActionListener(e ->
-                Navigation.go(this, new CalendarWindow())
-        );
-
-        setVisible(true);
+        if (onSaved != null) onSaved.run();
+        dispose();
     }
 }

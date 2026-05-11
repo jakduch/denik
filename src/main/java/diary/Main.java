@@ -1,25 +1,36 @@
 package diary;
 
 import diary.storage.FileStorage;
-import diary.ui.MainWindow;
+import diary.ui.CalendarWindow;
+import diary.ui.NameWindow;
+import diary.ui.WelcomeWindow;
 
 import javax.swing.*;
 
 public class Main {
+
     public static void main(String[] args) {
 
-        SwingUtilities.invokeLater(() -> {
+        // české vykreslení čar - kvůli emoji a diakritice ve fontech
+        System.setProperty("awt.useSystemAAFontSettings", "on");
+        System.setProperty("swing.aatext", "true");
 
-            String name = FileStorage.loadUserName();
+        SwingUtilities.invokeLater(Main::start);
+    }
 
-            if (name == null || name.isEmpty()) {
-                name = JOptionPane.showInputDialog("Zadej své jméno:");
-                FileStorage.saveUserName(name);
-            }
+    private static void start() {
+        String name = FileStorage.loadUserName();
 
+        if (name == null || name.isEmpty()) {
+            // první spuštění - zeptáme se na jméno
+            new NameWindow(saved -> new WelcomeWindow(saved, Main::openCalendar));
+        } else {
+            // další spuštění - krátká uvítací obrazovka, pak kalendář
+            new WelcomeWindow(name, Main::openCalendar);
+        }
+    }
 
-
-            new MainWindow(name);
-        });
+    private static void openCalendar() {
+        new CalendarWindow().setVisible(true);
     }
 }
